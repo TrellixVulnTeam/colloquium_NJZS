@@ -6,14 +6,13 @@ class workerTxt:
     def __init__(self, filename):
         self.filename = filename
     def get_town_by_id(self, id):
-        file = open("RU.txt")
+        file = open(self.filename)
         for line in file:
             if(line.startswith(str(id)+'\t')):
-                file = open("RU.txt")
                 return line.replace(str(id)+'\t', '')
         return "No such town"
     def get_n_towns_from(self, id, count):
-        file = open("RU.txt")
+        file = open(self.filename)
         towns = []
         n = 0
         start_count = False
@@ -27,20 +26,20 @@ class workerTxt:
                 n += 1
         if(not start_count):
             return "No such town"
-        file = open("RU.txt")
+        file = open(self.filename)
         for line in file:
             if (n == count):
                 return towns
             towns.append(re.sub(r'^\d*\t','',line))
             n += 1
     def get_n_towns(self, count):
-        file = open("RU.txt")
+        file = open(self.filename)
         towns = []
         for i in range(count):
             towns.append(re.sub(r'^\d*\t','',file.readline()))
         return towns
     def get_norther_town(self, first, second):
-        file = open("RU.txt")
+        file = open(self.filename)
         first_pretenders = [] # номинанты быть первым городом
         second_pretenders = [] # номинанты быть вторым городом
         for line in file:
@@ -85,14 +84,14 @@ class workerTxt:
 # TESTS
 if(__name__ == "__main__"):
     worker = workerTxt("RU.txt")
-    print("No such town (id == 1):\n", worker.get_town_by_id(1))
-    print("Return town:\n", worker.get_town_by_id(451748))
+    # print("No such town (id == 1):\n", worker.get_town_by_id(1))
+    # print("Return town:\n", worker.get_town_by_id(451748))
     test = worker.get_n_towns_from(451747,50)
     print("Return 50 towns:\n", test)
     test = worker.get_n_towns_from(12110389,50)
     print(f"Return 50 towns after end of file:\n Length == {len(test)}\n", test[0],test[49])
     print("No such town (id == 1):\n", worker.get_n_towns_from(1,50))
-    print("Return 50 towns from start:\n", worker.get_n_towns(50))
-    print("No such towns:\n", worker.get_norther_town("asd","asdsf"))
-    print("Return norther town, no difference:\n", worker.get_norther_town("Посёлок Логи","Гора Петяявара"))
-    print("Return norther town, there is difference:\n", worker.get_norther_town("Урочище Салокачи", "Гора Петяявара"))
+    # print("Return 50 towns from start:\n", worker.get_n_towns(50))
+    # print("No such towns:\n", worker.get_norther_town("asd","asdsf"))
+    # print("Return norther town, no difference:\n", worker.get_norther_town("Посёлок Логи","Гора Петяявара"))
+    # print("Return norther town, there is difference:\n", worker.get_norther_town("Урочище Салокачи", "Гора Петяявара"))

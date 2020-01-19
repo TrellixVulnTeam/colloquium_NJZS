@@ -5,7 +5,7 @@ import socket
 import sys
 from email.parser import Parser
 from functools import lru_cache
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, urlencode, quote
 import re  # for regulars
 
 MAX_LINE = 64 * 1024
@@ -38,6 +38,7 @@ class Server:
             serv_sock.close()
 
     def serve_client(self, conn):
+        print("Serving client")
         try:
             req = self.parse_request(conn)
             resp = self.handle_request(req)
@@ -70,13 +71,18 @@ class Server:
             raise HTTPError(400, 'Bad request',
                             'Request line is too long')
 
+
+
         req_line = str(raw, 'iso-8859-1')
         words = req_line.split()
+        words[1] = str(raw, 'utf-8').split()[1]
         if len(words) != 3:
             raise HTTPError(400, 'Bad request',
                             'Malformed request line')
 
         method, target, ver = words
+
+        # target = target.decode('iso-8859-1')
         if ver != 'HTTP/1.1':
             raise HTTPError(505, 'HTTP Version Not Supported')
         return method, target, ver
@@ -99,25 +105,18 @@ class Server:
         return Parser().parsestr(sheaders)
 
     def handle_request(self, req):
-        if req.path == '/users' and req.method == 'POST':
-            return self.handle_post_users(req)
-
-        if req.path == '/users' and req.method == 'GET':
-            return self.handle_get_users(req)
 
         if req.path == '/towns' and req.method == 'GET':
+            print("Got signal to handle_get_n_towns_from")
             return self.handle_get_n_towns_from(req)
 
         if req.path == '/towns/north' and req.method == 'GET':
+            print("Got signal to handle_get_norther_town")
             return self.handle_get_norther_town(req)
 
         if req.path == '/towns/id' and req.method == 'GET':
+            print("Got signal to handle_get_town_by_id")
             return self.handle_get_town_by_id(req)
-
-        if req.path.startswith('/users/'):
-            user_id = req.path[len('/users/'):]
-            if user_id.isdigit():
-                return self.handle_get_user(req, user_id)
 
         raise HTTPError(404, 'Not found')
 
@@ -154,62 +153,80 @@ class Server:
         self.send_response(conn, resp)
 
     def handle_get_town_by_id(self, req):
+        print("Start handle_get_town_by_id")
         accept = req.headers.get('Accept')
         if 'text/html' in accept:
             contentType = 'text/html; charset=utf-8'
-            data = {'id': req.query['id'][0]}
-            text = self._worker.get_town_by_id(data['id'])
+            data = {'id': req.query_ru['id'][0]}
+            print("Data:\n",data)
+            text = self._worker.get_town_by_id(int(data['id']))
+            print(text)
             body = '<html><head></head><body>'
             body += f'#{text}'
             body += '</body></html>'
         else:
+            print("Error in Accept")
             return Response(406, 'Not Acceptable')
         body = body.encode('utf-8')
         headers = [('Content-Type', contentType),
                    ('Content-Length', len(body))]
+        print("End handle_get_town_by_id")
         return Response(200, 'OK', headers, body)
 
     def handle_get_n_towns_from(self, req):
-      accept = req.headers.get('Accept')
-      if 'text/html' in accept:
-        contentType = 'text/html; charset=utf-8'
-        data = {'id': req.query['id'][0],
-                'n': req.query['n'][0]}
-        text = self._worker.get_n_towns_from(data['id'],data['n'])
-        body = '<html><head></head><body'
-        body += f'<div>Города ({len(text)})</div>'
-        body += '<ul>'
-        for line in text:
-          body += f'<li>#{line}</li>'
-        body += '</ul>'
-        body += '</body></html>'
-      else:
-        return Response(406, 'Not Acceptable')
-      body = body.encode('utf-8')
-      headers = [('Content-Type', contentType),
-                 ('Content-Length', len(body))]
-      return Response(200, 'OK', headers, body)
+        print("Start handle_get_n_towns_from")
+        accept = req.headers.get('Accept')
+        if 'text/html' in accept:
+            contentType = 'text/html; charset=utf-8'
+            data = {'id': req.query['id'][0],
+                    'n': req.query['n'][0]}
+            print("Data:\n",data)
+            text = self._worker.get_n_towns_from(int(data['id']), int(data['n']))
+            print(text)
+            body = '<html><head></head><body>'
+            body += f'<div>Города ({len(text)})</div>'
+            body += '<ul>'
+            for line in text:
+                body += f'<li>#{line}</li>'
+            body += '</ul>'
+            body += '</body></html>'
+        else:
+            print("Error in Accept")
+            return Response(406, 'Not Acceptable')
+        body = body.encode('utf-8')
+        headers = [('Content-Type', contentType),
+                   ('Content-Length', len(body))]
+        print("End handle_get_n_towns_from")
+        return Response(200, 'OK', headers, body)
 
     def handle_get_norther_town(self, req):
-      accept = req.headers.get('Accept')
-      if 'text/html' in accept:
-        contentType = 'text/html; charset=utf-8'
-        data = {'first': req.query['first'][0],
-                'second': req.query['second'][0]}
-        text = self._worker.get_norther_town(data['first'], data['second'])
-        body = '<html><head></head><body'
-        body += f'<div>{text["difference"]}</div>'
-        body += '<ul>'
-        body += f'<li>Север: {text["north"]}</li>'
-        body += f'<li>Юг: {text["south"]}</li>'
-        body += '</ul>'
-        body += '</body></html>'
-      else:
-        return Response(406, 'Not Acceptable')
-      body = body.encode('utf-8')
-      headers = [('Content-Type', contentType),
-                 ('Content-Length', len(body))]
-      return Response(200, 'OK', headers, body)
+        print("Start handle_get_norther_town")
+        accept = req.headers.get('Accept')
+        if 'text/html' in accept:
+            contentType = 'text/html; charset=utf-8'
+            print("Want to get data")
+            data = {'first': req.query['first'][0],
+                    'second': req.query['second'][0]}
+            print("Data:\n",data)
+            text = self._worker.get_norther_town(data['first'], data['second'])
+            body = '<html><head></head><body>'
+            if isinstance(text, str):
+                body += f'<div>{text}</div>'
+            else:
+                body += f'<div>{text["difference"]}</div>'
+                body += '<ul>'
+                body += f'<li>Север: {text["north"]}</li>'
+                body += f'<li>Юг: {text["south"]}</li>'
+                body += '</ul>'
+            body += '</body></html>'
+        else:
+            print("Error in Accept")
+            return Response(406, 'Not Acceptable')
+        body = body.encode('utf-8')
+        headers = [('Content-Type', contentType),
+                   ('Content-Length', len(body))]
+        print("End handle_get_norther_town")
+        return Response(200, 'OK', headers, body)
 
 
 class Request:
@@ -262,15 +279,14 @@ class workerTxt:
         self.filename = filename
 
     def get_town_by_id(self, id):
-        file = open("RU.txt")
+        file = open(self.filename)
         for line in file:
             if (line.startswith(str(id) + '\t')):
-                file = open("RU.txt")
                 return line.replace(str(id) + '\t', '')
         return "No such town"
 
     def get_n_towns_from(self, id, count):
-        file = open("RU.txt")
+        file = open(self.filename)
         towns = []
         n = 0
         start_count = False
@@ -284,7 +300,7 @@ class workerTxt:
                 n += 1
         if (not start_count):
             return "No such town"
-        file = open("RU.txt")
+        file = open(self.filename)
         for line in file:
             if (n == count):
                 return towns
@@ -292,14 +308,14 @@ class workerTxt:
             n += 1
 
     def get_n_towns(self, count):
-        file = open("RU.txt")
+        file = open(self.filename)
         towns = []
         for i in range(count):
             towns.append(re.sub(r'^\d*\t', '', file.readline()))
         return towns
 
     def get_norther_town(self, first, second):
-        file = open("RU.txt")
+        file = open(self.filename)
         first_pretenders = []  # номинанты быть первым городом
         second_pretenders = []  # номинанты быть вторым городом
         for line in file:
